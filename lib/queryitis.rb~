@@ -1,0 +1,62 @@
+require "queryitis/version"
+require 'savon'
+
+module Queryitis
+  class Query
+	  def self.query_by_name(search_key)
+		  @@client = Savon.client(wsdl: "http://www.itis.gov/ITISWebService.xml", log: false, pretty_print_xml: true)
+	      # first try searching by common name
+	      @@response = @@client.call(:search_for_any_match, message: { srchKey: search_key } )
+
+	      # convert the response into an array containing hashes for each itis entry returned
+	      Response.new(@@response.body[:search_for_any_match_response][:return][:any_match_list])
+	  end # end query_by_name
+  end # end Query
+  
+  class Response
+   include Enumerable
+   attr_reader :data
+
+   def initialize(data)
+      @data = data
+      @entries = []
+
+      @data.each do |entry|
+             @entries << Hash[
+                "common_name",  entry[:common_name_list][:common_names][:common_name], 
+                "latin_name", entry[:sci_name], 
+                "itis_id", entry[:tsn]
+            ]
+        end # end data.each
+    end # end initialize
+
+    def success?
+        @data != nil
+    end # end success?
+
+    def common_names
+      names = []
+
+      @data.each do |entry|
+         names << entry[:common_name_list][:common_names][:common_name]
+     end # data.each
+     names
+    end # end common_names
+
+    def latin_names
+      names = []
+
+      @data.each do |entry|
+         names << entry[:sci_name]
+      end # end data.each
+     names
+    end # end latin_names
+
+    def each
+      entries.each do |entry|
+       yield entry
+      end # end entries.each
+   end # end each
+   end # end Response
+end #end Queryitis
+
